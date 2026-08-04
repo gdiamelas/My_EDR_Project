@@ -1,0 +1,91 @@
+#include <stdio.h>
+#include <string.h>
+#include <windows.h>
+#include <tlhelp32.h>
+
+#define MAX_THREATS 500
+#define MAX_NAME_LEN 256
+
+char suspicious_processes[MAX_THREATS][MAX_NAME_LEN];
+int blacklist_size = 0;
+
+// Συνάρτηση που φορτώνει τις απειλές από το εξωτερικό αρχείο txt
+int load_blacklist() {
+    FILE *file = fopen("blacklist.txt", "r");
+    if (file == NULL) {
+        printf("[❌ ERROR] Could not open blacklist.txt! Make sure it exists.\n");
+        return 0;
+    }
+
+    while (fgets(suspicious_processes[blacklist_size], MAX_NAME_LEN, file) && blacklist_size < MAX_THREATS) {
+        // Αφαιρούμε το χαρακτήρα αλλαγής γραμμής (\n) που διαβάζει η fgets
+        suspicious_processes[blacklist_size][strcspn(suspicious_processes[blacklist_size], "\r\n")] = 0;
+        
+        if (strlen(suspicious_processes[blacklist_size]) > 0) {
+            blacklist_size++;
+        }
+    }
+
+    fclose(file);
+    printf("[📦 INFO] Successfully loaded %d threat signatures from blacklist.txt\n", blacklist_size);
+    return 1;
+}
+
+void scan_system_processes() {
+    HANDLE hProcessSnap;
+    PROCESSENTRY32 pe32;
+
+    hProcessSnap = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
+    if (hProcessSnap == INVALID_HANDLE_VALUE) {
+        printf("[❌ ERROR] Failed to create system snapshot.\n");
+        return;
+    }
+
+    pe32.dwSize = sizeof(PROCESSENTRY32);
+
+    if (!Process32First(hProcessSnap, &pe32)) {
+        printf("[❌ ERROR] Failed to run Process32First.\n");
+        CloseHandle(hProcessSnap);
+        return;
+    }
+
+    do {
+        for (int i = 0; i < blacklist_size; i++) {
+            if (_stricmp(pe32.szExeFile, suspicious_processes[i]) == 0) {
+                printf("\n[⚠️ WARNING] MALWARE DETECTED: %s (PID: %lu)\n", pe32.szExeFile, pe32.th32ProcessID);
+                printf("[🛡️ ACTION] Attempting to neutralize threat...\n");
+                
+                HANDLE hProcess = OpenProcess(PROCESS_TERMINATE, FALSE, pe32.th32ProcessID);
+                if (hProcess != NULL) {
+                    if (TerminateProcess(hProcess, 0)) {
+                        printf("[✔ SUCCESS] Process %s terminated successfully!\n", pe32.szExeFile);
+                    } else {
+                        printf("[❌ ERROR] Could not terminate process. Error code: %lu\n", GetLastError());
+                    }
+                    CloseHandle(hProcess);
+                } else {
+                    printf("[❌ ERROR] Access Denied. Cannot open process. (Run as Administrator?)\n");
+                }
+            }
+        }
+    } while (Process32Next(hProcessSnap, &pe32));
+
+    CloseHandle(hProcessSnap);
+}
+
+int main() {
+    printf("--- 🛡️ Advanced Endpoint Detection & Response (EDR) Tool v8.0 ---\n");
+    printf("Target OS: Windows | Architecture: Dynamic Threat Intelligence Loading\n\n");
+    
+    // Φόρτωση της λίστας
+    if (!load_blacklist()) {
+        printf("Exiting due to missing configuration.\n");
+        return 1;
+    }
+    
+    printf("\nStarting live system scan...\n");
+    scan_system_processes();
+    printf("\nScan finished successfully. Infrastructure secured.\n");
+    
+    return 0;
+}

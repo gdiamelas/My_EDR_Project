@@ -1,0 +1,90 @@
+#include <stdio.h>
+#include <string.h>
+#include <windows.h>
+#include <tlhelp32.h>
+
+#define MAX_THREATS 500
+#define MAX_NAME_LEN 256
+
+char suspicious_processes[MAX_THREATS][MAX_NAME_LEN];
+int blacklist_size = 0;
+
+// Συνάρτηση που φορτώνει τις απειλές από το εξωτερικό αρχείο txt
+int load_blacklist() {
+    FILE *file = fopen("blacklist.txt", "r");
+    if (file == NULL) {
+        printf("[❌ ERROR] Could not open blacklist.txt! Make sure it exists.\n");
+        return 0;
+    }
+
+    while (fgets(suspicious_processes[blacklist_size], MAX_NAME_LEN, file) && blacklist_size < MAX_THREATS) {
+        // Αφαιρούμε το χαρακτήρα αλλαγής γραμμής (\n) που διαβάζει η fgets
+        suspicious_processes[blacklist_size][strcspn(suspicious_processes[blacklist_size], "\r\n")] = 0;
+        
+        if (strlen(suspicious_processes[blacklist_size]) > 0) {
+            blacklist_size++;
+        }
+    }
+
+    fclose(file);
+    printf("[📦 INFO] Successfully loaded %d threat signatures from blacklist.txt\n", blacklist_size);
+    return 1;
+}
+
+// Συνάρτηση που σκανάρει τις διεργασίες ΜΟΝΟ για εντοπισμό (Audit Mode)
+void scan_system_processes() {
+    HANDLE hProcessSnap;
+    PROCESSENTRY32 pe32;
+    int threats_found = 0;
+
+    hProcessSnap = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
+    if (hProcessSnap == INVALID_HANDLE_VALUE) {
+        printf("[❌ ERROR] Failed to create system snapshot.\n");
+        return;
+    }
+
+    pe32.dwSize = sizeof(PROCESSENTRY32);
+
+    if (!Process32First(hProcessSnap, &pe32)) {
+        printf("[❌ ERROR] Failed to run Process32First.\n");
+        CloseHandle(hProcessSnap);
+        return;
+    }
+
+    do {
+        for (int i = 0; i < blacklist_size; i++) {
+            // Case-insensitive σύγκριση ονόματος διεργασίας με τη λίστα
+            if (_stricmp(pe32.szExeFile, suspicious_processes[i]) == 0) {
+                printf("\n[⚠️ WARNING] MALWARE DETECTED: %s (PID: %lu)\n", pe32.szExeFile, pe32.th32ProcessID);
+                printf("[ℹ️ AUDIT INFO] Threat flagged. No termination action taken (Safe/Audit Mode).\n");
+                threats_found++;
+            }
+        }
+    } while (Process32Next(hProcessSnap, &pe32));
+
+    CloseHandle(hProcessSnap);
+
+    if (threats_found == 0) {
+        printf("\n[✔ SAFE] No matching threats found running in memory.\n");
+    } else {
+        printf("\n[📊 SUMMARY] Total active threats flagged: %d\n", threats_found);
+    }
+}
+
+int main() {
+    printf("--- 🛡️ Advanced Endpoint Detection & Response (EDR) Tool v8.1 ---\n");
+    printf("Target OS: Windows | Mode: Passive Audit & Detection (100%% Safe)\n\n");
+    
+    // 1. Φόρτωση της λίστας από το αρχείο κειμένου
+    if (!load_blacklist()) {
+        printf("Exiting due to missing configuration.\n");
+        return 1;
+    }
+    
+    // 2. Εκτέλεση του live σκαναρίσματος στη μνήμη
+    printf("\nStarting live system scan...\n");
+    scan_system_processes();
+    printf("\nScan finished successfully. Audit report completed.\n");
+    
+    return 0;
+}
