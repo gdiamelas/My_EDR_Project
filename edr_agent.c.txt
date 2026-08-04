@@ -9,7 +9,7 @@
 char suspicious_processes[MAX_THREATS][MAX_NAME_LEN];
 int blacklist_size = 0;
 
-// Συνάρτηση που φορτώνει τις απειλές από το εξωτερικό αρχείο txt
+
 int load_blacklist() {
     FILE *file = fopen("blacklist.txt", "r");
     if (file == NULL) {
@@ -18,8 +18,7 @@ int load_blacklist() {
     }
 
     while (fgets(suspicious_processes[blacklist_size], MAX_NAME_LEN, file) && blacklist_size < MAX_THREATS) {
-        // Αφαιρούμε το χαρακτήρα αλλαγής γραμμής (\n) που διαβάζει η fgets
-        suspicious_processes[blacklist_size][strcspn(suspicious_processes[blacklist_size], "\r\n")] = 0;
+       suspicious_processes[blacklist_size][strcspn(suspicious_processes[blacklist_size], "\r\n")] = 0;
         
         if (strlen(suspicious_processes[blacklist_size]) > 0) {
             blacklist_size++;
@@ -77,7 +76,7 @@ int main() {
     printf("--- 🛡️ Advanced Endpoint Detection & Response (EDR) Tool v8.0 ---\n");
     printf("Target OS: Windows | Architecture: Dynamic Threat Intelligence Loading\n\n");
     
-    // Φόρτωση της λίστας
+  
     if (!load_blacklist()) {
         printf("Exiting due to missing configuration.\n");
         return 1;
