@@ -1,19 +1,1 @@
-# 🛡️ Windows EDR Agent - Passive Audit Mode (v8.1)
 
-A lightweight Endpoint Detection & Response (EDR) agent simulator written in C using the Win32 API. This tool performs live memory auditing by scanning running processes against a dynamic Threat Intelligence Feed (`blacklist.txt`).
-
-## ⚙️ Features
-- **Dynamic Threat Intel:** Loads threat signatures at runtime from an external file without re-compilation.
-- **Passive Audit Mode:** 100% safe execution. Flags threats in memory without process termination (No False Positive crashes).
-- **Win32 API Integration:** Uses `CreateToolhelp32Snapshot` for low-level process auditing.
-- **Case-Insensitive Matching:** Detects obfuscated process names (e.g., `mImIkAtZ.eXe`).
-
-## 📁 Project Structure
-- `edr_audit.c` - The core C source code.
-- `blacklist.txt` - Text file containing active malware process names.
-
-## 🚀 How to Run
-1. Clone this repository.
-2. Ensure `blacklist.txt` is in the same directory as the executable.
-3. Compile using GCC: `gcc edr_audit.c -o edr_audit.exe`
-4. Run the executable. (Does NOT require Administrator privileges for Audit Mode).
